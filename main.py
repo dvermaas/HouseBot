@@ -14,16 +14,14 @@ TIMEOUT = 5
 username = ""
 password = ""
 
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(
+    filename="housebot.log",
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s',
+)
 logger = logging.getLogger(__name__)
+logger.info(f"Started script")
 driver = webdriver.Chrome()
-
-# Cookies & Login
-driver.get(BASE_URL)
-WebDriverWait(driver, TIMEOUT).until(EC.presence_of_element_located((By.ID, "cookiescript_accept"))).click()
-WebDriverWait(driver, TIMEOUT).until(EC.presence_of_element_located((By.ID, "Input_UsernameVal"))).send_keys(username)
-WebDriverWait(driver, TIMEOUT).until(EC.presence_of_element_located((By.ID, "Input_PasswordVal"))).send_keys(password)
-WebDriverWait(driver, TIMEOUT).until(EC.presence_of_element_located((By.ID, "b8-Button"))).click()
 
 # Get Previous Data
 try:
@@ -32,9 +30,20 @@ try:
 except FileNotFoundError:
     advert_history = {}
 
+# Cookies & Login
+driver.get(BASE_URL)
+WebDriverWait(driver, TIMEOUT).until(EC.presence_of_element_located((By.ID, "cookiescript_accept"))).click()
+WebDriverWait(driver, TIMEOUT).until(EC.presence_of_element_located((By.ID, "Input_UsernameVal"))).send_keys(username)
+WebDriverWait(driver, TIMEOUT).until(EC.presence_of_element_located((By.ID, "Input_PasswordVal"))).send_keys(password)
+WebDriverWait(driver, TIMEOUT).until(EC.presence_of_element_located((By.ID, "b8-Button"))).click()
+
 # Get Links
-elements = WebDriverWait(driver, TIMEOUT).until(EC.presence_of_all_elements_located((By.XPATH, '//a[contains(@id, "HuisContainerLink")]')))
-advert_links = [element.get_attribute('href') for element in elements]
+article_element = WebDriverWait(driver, TIMEOUT).until(
+    EC.presence_of_element_located((By.CLASS_NAME, 'osui-tabs__content-item.osui-tabs--is-active'))
+)
+links = article_element.find_elements(By.TAG_NAME, 'a')
+advert_links = [link.get_attribute('href') for link in links]
+logger.info(f"Found {len(advert_links)} adverts that meet requirements: {advert_links}")
 
 # Get Ads
 
@@ -70,6 +79,7 @@ for advert_link in advert_links:
     advert_id = advert_link.split("=")[-1]
     if advert_id not in advert_history:
         advert_history[advert_id] = parse_ad(advert_link)
+        logging.info(f"Added {advert_id} to {file}")
 
 with open(DUMP_FILE, 'w') as file:
     json.dump(advert_history, file, indent=4)
